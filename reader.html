@@ -1,0 +1,1328 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>小說電台</title>
+<link rel="icon" type="image/png" href="/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Chakra+Petch:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<style>
+/* 風格：深夜街頭的 HUD 介面——黑底網點、螢光黃綠重點色、斜切角、警示斜紋、貼紙標籤。刻意只做深色一種外觀 */
+:root {
+  --bg: #0B0B0D;
+  --surface: #16161A;
+  --surface-2: #202026;
+  --ink: #F1F1EA;
+  --text: #DCDCD4;
+  --muted: #8A8A93;
+  --line: #2C2C34;
+  --accent: #D4FF1C;
+  --accent-ink: #0B0B0D;
+  --accent-soft: rgba(212, 255, 28, .12);
+  --hot: #FF5A1F;
+  --live: #FF3B3B;
+  --shadow: 0 18px 40px rgba(0, 0, 0, .55);
+  --f-display: "Anton", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  --f-cjk: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --f-tech: "Chakra Petch", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  --f-read: var(--f-cjk);
+  --f-ui: var(--f-cjk);
+  --ease: cubic-bezier(.2, .9, .2, 1);
+  --cut: 14px;
+  --side-w: 320px;
+  --player-h: 136px;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  color: var(--text); font-family: var(--f-cjk); font-size: 15px; line-height: 1.6;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(rgba(255, 255, 255, .055) 1px, transparent 1.5px),
+    linear-gradient(135deg, rgba(212, 255, 28, .05), transparent 40%);
+  background-size: 14px 14px, 100% 100%;
+  background-attachment: fixed;
+}
+/* 掃描線，非常淡 */
+body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 100;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .018) 0 1px, transparent 1px 3px);
+}
+/* 播放時右上角亮起螢光 */
+body::before {
+  content: ""; position: fixed; right: -20vw; top: -30vh; width: 70vw; height: 70vh; pointer-events: none; z-index: 0;
+  background: radial-gradient(circle, rgba(212, 255, 28, .10), transparent 60%);
+  opacity: 0; transition: opacity 1.2s var(--ease);
+}
+body.on-air::before { opacity: 1; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+::selection { background: var(--accent); color: var(--accent-ink); }
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+
+/* ---------- top bar ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px));
+  background: rgba(11, 11, 13, .86);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+.topbar::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  background: linear-gradient(90deg, var(--accent) 0 120px, transparent 120px);
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo h1 { font-family: var(--f-cjk); font-weight: 900; font-size: 21px; margin: 0; letter-spacing: .08em; color: var(--ink); }
+.logo .en {
+  font-family: var(--f-display); font-size: 13px; letter-spacing: .12em; color: var(--accent-ink); background: var(--accent);
+  padding: 1px 8px 0; clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%); line-height: 1.5;
+}
+.logo-cat { width: 34px; height: 34px; display: block; transform-origin: 50% 90%; }
+/* 播放時貓咪跟著輕輕點頭 */
+body.on-air .logo-cat { animation: bob 1.6s ease-in-out infinite; }
+@keyframes bob { 50% { transform: rotate(-6deg) translateY(-1px); } }
+.lamp { position: relative; width: 9px; height: 9px; background: var(--muted); transform: rotate(45deg); transition: background .3s; }
+.lamp.on { background: var(--live); animation: blink 1.2s steps(2, jump-none) infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+.status {
+  font-family: var(--f-tech); font-weight: 700; font-size: 11px; letter-spacing: .2em; color: var(--muted);
+  padding: 2px 10px; border: 1px solid var(--line); white-space: nowrap; transition: color .3s, border-color .3s;
+}
+body.on-air .status { color: var(--accent); border-color: var(--accent); }
+.spacer { flex: 1; }
+.icon-btn {
+  width: 36px; height: 36px; border: 1px solid transparent; background: transparent; display: grid; place-items: center; padding: 0;
+  color: var(--muted); clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  transition: background .15s, color .15s, transform .12s;
+}
+.icon-btn:hover { background: var(--surface-2); color: var(--accent); }
+.icon-btn:active { transform: scale(.9); }
+.icon-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: square; }
+.icon-btn .txt { font-family: var(--f-tech); font-size: 14px; font-weight: 700; }
+
+/* ---------- layout ---------- */
+.layout {
+  position: relative; z-index: 1;
+  display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); gap: 32px;
+  max-width: 1280px; margin: 0 auto;
+  padding-block: 24px calc(var(--player-h) + 44px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  transition: grid-template-columns .45s var(--ease);
+}
+body.side-collapsed .layout { grid-template-columns: 0 minmax(0, 1fr); gap: 0; }
+body.side-collapsed .side { opacity: 0; pointer-events: none; transform: translateX(-20px); }
+
+/* ---------- side ---------- */
+.side {
+  position: sticky; top: 80px; align-self: start; max-height: calc(100vh - 80px - var(--player-h) - 44px);
+  display: flex; flex-direction: column; gap: 12px; min-width: 0;
+  transition: opacity .3s var(--ease), transform .45s var(--ease);
+}
+.open-box {
+  display: flex; align-items: center; gap: 6px; padding: 5px 5px 5px 12px;
+  background: var(--surface); border: 1px solid var(--line);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  transition: border-color .2s, background .2s;
+}
+.open-box:focus-within { border-color: var(--accent); background: var(--surface-2); }
+.open-box svg { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-linecap: square; }
+.open-box input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 9px 4px; font-size: 14px; outline: none; color: var(--ink); }
+.open-box input::placeholder { color: var(--muted); }
+.go {
+  border: 0; padding: 8px 16px 7px; background: var(--accent); color: var(--accent-ink);
+  font-family: var(--f-cjk); font-weight: 900; font-size: 14px; letter-spacing: .1em;
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  transition: background .15s, transform .12s;
+}
+.go:hover { background: var(--ink); }
+.go:active { transform: translateY(1px) scale(.97); }
+.hint { font-size: 12px; color: var(--muted); margin: -2px 2px 2px; line-height: 1.6; }
+
+.tabs-card {
+  display: flex; flex-direction: column; min-height: 0; flex: 1;
+  background: var(--surface); border: 1px solid var(--line);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
+}
+.tabs { position: relative; display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); }
+.tab {
+  position: relative; z-index: 1; border: 0; background: transparent; padding: 12px 0 10px;
+  font-family: var(--f-cjk); font-size: 14px; color: var(--muted); font-weight: 700; letter-spacing: .1em; transition: color .2s;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--accent); }
+.tab-ink {
+  position: absolute; bottom: -1px; left: 0; width: 50%; height: 3px; background: var(--accent);
+  transition: transform .35s var(--ease);
+}
+.tabs[data-tab="recent"] .tab-ink { transform: translateX(100%); }
+.pane { overflow-y: auto; padding: 8px; min-height: 0; flex: 1; }
+.pane-empty { padding: 32px 16px; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.8; }
+#tocPanel:not([hidden]) + .pane-empty, #recentPanel:not([hidden]) + .pane-empty { display: none; }
+.toc-book { font-family: var(--f-cjk); font-weight: 900; font-size: 16px; color: var(--ink); padding: 8px 10px 6px; }
+
+.toc summary {
+  list-style: none; display: flex; align-items: center; gap: 8px; padding: 9px 10px; cursor: pointer;
+  font-family: var(--f-cjk); font-weight: 700; font-size: 14px; color: var(--ink); transition: background .15s, color .15s;
+}
+.toc summary::-webkit-details-marker { display: none; }
+.toc summary::before {
+  content: ""; width: 0; height: 0; flex: none; border-left: 6px solid var(--accent); border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  transition: transform .25s var(--ease);
+}
+.toc details[open] > summary::before { transform: rotate(90deg); }
+.toc summary:hover { background: var(--surface-2); color: var(--accent); }
+.toc ul { list-style: none; margin: 0 0 6px 13px; padding: 0 0 0 12px; border-left: 1px dashed var(--line); }
+.toc details[open] ul { animation: drop .3s var(--ease); }
+@keyframes drop { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+.toc li {
+  position: relative; padding: 6px 10px; cursor: pointer; font-size: 14px; color: var(--muted);
+  transition: background .15s, color .15s, padding-left .2s var(--ease);
+}
+.toc li:hover { background: var(--surface-2); color: var(--ink); padding-left: 16px; }
+.toc li.active { color: var(--accent-ink); background: var(--accent); font-weight: 700; padding-left: 14px; }
+.toc li.active::before {
+  content: ""; position: absolute; left: -16px; top: 50%; width: 7px; height: 7px; background: var(--accent); transform: translateY(-50%) rotate(45deg);
+}
+
+.recent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.recent li {
+  display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 0; cursor: pointer;
+  border-bottom: 1px solid var(--line); transition: background .15s, transform .2s var(--ease);
+}
+.recent li:hover { background: var(--surface-2); transform: translateX(3px); }
+.recent li::before { content: ""; width: 4px; align-self: stretch; background: var(--line); flex: none; transition: background .2s; }
+.recent li.active::before, .recent li:hover::before { background: var(--accent); }
+.recent .meta { flex: 1; min-width: 0; }
+.recent .t { font-weight: 900; font-size: 15px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recent .s { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recent .btn { border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 12px; padding: 3px 8px; opacity: 0; transition: opacity .2s, color .2s, border-color .2s; }
+.recent li:hover .btn, .recent .btn:focus-visible { opacity: 1; }
+.recent .btn:hover { color: var(--hot); border-color: var(--hot); }
+
+/* ---------- reading ---------- */
+main { min-width: 0; display: flex; justify-content: center; }
+.page { width: 100%; max-width: 760px; }
+.ch-head { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 6px 0 34px; }
+.ch-head .eyebrow {
+  font-family: var(--f-tech); font-weight: 700; font-size: 12px; letter-spacing: .14em; color: var(--accent-ink); background: var(--accent);
+  padding: 3px 12px 2px; transform: rotate(-1.5deg);
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+.ch-head h2 { font-family: var(--f-cjk); font-weight: 900; font-size: clamp(28px, 4.4vw, 42px); line-height: 1.25; margin: 0; color: var(--ink); text-wrap: balance; letter-spacing: .02em; }
+.ch-head .rule { width: 48px; height: 3px; background: var(--accent); transform-origin: left; }
+.reader { font-family: var(--f-read); font-size: var(--read-size, 18px); line-height: 2.05; letter-spacing: .03em; color: var(--text); }
+.reader p { margin: 0 0 1em; text-indent: 2em; }
+.reader .s {
+  cursor: pointer; padding: 2px 1px; -webkit-box-decoration-break: clone; box-decoration-break: clone;
+  background-image: linear-gradient(var(--accent), var(--accent));
+  background-repeat: no-repeat; background-position: 0 100%; background-size: 0 2px;
+  transition: background-size .5s var(--ease), color .3s, background-color .3s;
+}
+.reader .s:hover { background-color: rgba(255, 255, 255, .05); }
+.reader .s.read { color: var(--muted); }
+/* 正在念的句子：文字變亮、底色淡淡一層，底線由左到右畫過去 */
+.reader .s.now { color: var(--ink); background-color: rgba(212, 255, 28, .08); background-size: 100% 2px; }
+
+.enter .reader > * { animation: rise .5s var(--ease) both; }
+.enter .reader > *:nth-child(2) { animation-delay: .04s; }
+.enter .reader > *:nth-child(3) { animation-delay: .08s; }
+.enter .reader > *:nth-child(n+4) { animation-delay: .12s; }
+.enter .ch-head .eyebrow { animation: slap .45s var(--ease) both; }
+.enter .ch-head h2 { animation: glitch .55s steps(1, end) both; }
+.enter .ch-head .rule { animation: grow .6s .2s var(--ease) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes slap { from { opacity: 0; transform: rotate(-8deg) scale(1.3); } to { opacity: 1; transform: rotate(-1.5deg); } }
+/* 標題出現時短暫的訊號干擾 */
+@keyframes glitch {
+  0% { opacity: 0; }
+  10% { opacity: 1; transform: translateX(-4px); text-shadow: 3px 0 var(--hot), -3px 0 var(--accent); clip-path: inset(10% 0 55% 0); }
+  25% { transform: translateX(3px); text-shadow: -2px 0 var(--hot), 2px 0 var(--accent); clip-path: inset(50% 0 10% 0); }
+  40% { transform: translateX(-2px); text-shadow: 2px 0 var(--hot), -2px 0 var(--accent); clip-path: inset(0 0 0 0); }
+  60% { transform: translateX(1px); text-shadow: 1px 0 var(--hot), -1px 0 var(--accent); }
+  80%, 100% { transform: none; text-shadow: none; clip-path: none; }
+}
+.loading .ch-head h2 { animation: flick .9s steps(2, jump-none) infinite; }
+@keyframes flick { 50% { opacity: .3; } }
+
+/* 插圖 */
+.reader .illus {
+  position: relative; margin: 1.4em auto; max-width: 100%; text-align: center; cursor: zoom-in;
+  min-height: 120px; background: var(--surface); border: 1px solid var(--line);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  transition: border-color .2s;
+}
+.reader .illus:hover { border-color: var(--accent); }
+.reader .illus img { display: block; max-width: 100%; max-height: 80vh; margin: 0 auto; opacity: 0; transition: opacity .5s var(--ease); }
+.reader .illus.loaded { min-height: 0; background: transparent; }
+.reader .illus.loaded img { opacity: 1; }
+.reader .illus.broken { cursor: default; }
+.reader .illus.broken::after { content: attr(data-msg); position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+.illus-note { text-indent: 0 !important; font-size: 14px; }
+
+.lightbox {
+  position: fixed; inset: 0; z-index: 90; background: rgba(5, 5, 7, .92); display: grid; place-items: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  animation: lbIn .25s var(--ease);
+}
+@keyframes lbIn { from { opacity: 0; } to { opacity: 1; } }
+.lightbox img { max-width: 100%; max-height: calc(100vh - 80px); object-fit: contain; cursor: zoom-out; box-shadow: var(--shadow); }
+.lb-btn {
+  position: absolute; border: 1px solid var(--line); background: rgba(22, 22, 26, .85); color: var(--ink);
+  width: 44px; height: 44px; font-size: 26px; line-height: 1; display: grid; place-items: center;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); transition: background .15s, color .15s;
+}
+.lb-btn:hover { background: var(--accent); color: var(--accent-ink); }
+.lb-prev { left: max(16px, env(safe-area-inset-left, 0px)); top: 50%; transform: translateY(-50%); }
+.lb-next { right: max(16px, env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%); }
+.lb-close { right: max(16px, env(safe-area-inset-right, 0px)); top: max(16px, env(safe-area-inset-top, 0px)); }
+.lb-count { position: absolute; bottom: max(18px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); font-family: var(--f-tech); font-weight: 700; font-size: 13px; color: var(--accent); }
+
+/* 插圖集 */
+.gallery {
+  position: fixed; inset: 0; z-index: 85; background: rgba(5, 5, 7, .72);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  /* 用 flex 讓面板高度被畫面限制住，圖很多時是面板裡面捲動，而不是捲到後面的小說 */
+  display: flex; align-items: center; justify-content: center; overflow: hidden; overscroll-behavior: contain;
+  animation: lbIn .25s var(--ease);
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(var(--player-h) + 36px) max(16px, env(safe-area-inset-left, 0px));
+}
+.gallery-panel {
+  width: min(1000px, 100%); max-height: 100%; display: flex; flex-direction: column; gap: 12px;
+  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); padding: 18px;
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+  animation: rise .35s var(--ease);
+}
+.gallery-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gallery-head h3 { margin: 0; font-weight: 900; font-size: 18px; color: var(--ink); }
+.gallery-count { font-family: var(--f-tech); font-weight: 700; font-size: 12px; color: var(--accent-ink); background: var(--accent); padding: 1px 8px; }
+.gallery-note { font-size: 12px; color: var(--muted); }
+.gallery-close { position: static; }
+.gallery-msg { margin: 24px 0; text-align: center; color: var(--muted); }
+.gallery-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 2px 6px 2px 2px;
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; align-content: start;
+}
+/* 插圖集或全螢幕插圖開著時，後面的小說不跟著捲 */
+body.modal-open { overflow: hidden; }
+.thumb {
+  position: relative; aspect-ratio: 3 / 4; max-width: 100%; padding: 0; border: 1px solid var(--line); background: var(--surface-2);
+  overflow: hidden; cursor: zoom-in; transition: border-color .2s, transform .2s var(--ease);
+}
+.thumb:hover { border-color: var(--accent); transform: translateY(-2px); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity .4s var(--ease); }
+.thumb.loaded img { opacity: 1; }
+.icon-btn.wide { width: auto; padding: 0 10px; gap: 6px; display: inline-flex; align-items: center; }
+.icon-btn .lbl { font-size: 13px; font-weight: 700; }
+.link-btn { border: 0; background: none; padding: 0; margin-left: 6px; color: var(--accent); font-size: 12px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.link-btn:hover { color: var(--ink); }
+@media (max-width: 900px) { .icon-btn .lbl, .gallery-note { display: none; } }
+
+.welcome { display: grid; gap: 16px; }
+.welcome p { text-indent: 0; color: var(--muted); font-size: 14px; margin: 0; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: step; }
+.steps li {
+  counter-increment: step; display: flex; gap: 16px; align-items: center; padding: 16px 18px;
+  background: var(--surface); border: 1px solid var(--line); font-size: 15px; line-height: 1.7; color: var(--ink);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+  transition: border-color .2s, transform .2s var(--ease);
+}
+.steps li:hover { border-color: var(--accent); transform: translateX(4px); }
+.steps li::before {
+  content: "0" counter(step); flex: none; font-family: var(--f-display); font-size: 30px; line-height: 1; color: var(--accent); min-width: 1.4em;
+}
+.empty { color: var(--muted); font-size: 15px; }
+kbd { font-family: var(--f-tech); font-weight: 700; font-size: 12px; padding: 1px 7px; border: 1px solid var(--accent); color: var(--accent); }
+
+/* ---------- player ---------- */
+.player {
+  position: fixed; z-index: 40; left: 50%; transform: translateX(-50%);
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: min(1100px, calc(100% - 32px));
+  background: rgba(18, 18, 22, .92);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--line); box-shadow: var(--shadow);
+  padding: 18px 20px 12px;
+  animation: dock .6s var(--ease) both;
+}
+/* 頂端一條細的螢光線，不閃不動 */
+.hazard {
+  position: absolute; left: -1px; top: -1px; width: 120px; height: 2px; background: var(--accent);
+}
+/* 四角的 HUD 括號 */
+.player::before, .player::after {
+  content: ""; position: absolute; width: 14px; height: 14px; border: 2px solid var(--accent); pointer-events: none;
+}
+.player::before { left: -6px; bottom: -6px; border-right: 0; border-top: 0; }
+.player::after { right: -6px; bottom: -6px; border-left: 0; border-top: 0; }
+@keyframes dock { from { opacity: 0; transform: translate(-50%, 24px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.player-in { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px 20px; align-items: center; }
+.now { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.eq { display: flex; align-items: flex-end; gap: 3px; height: 24px; flex: none; }
+.eq i { width: 4px; height: 25%; background: var(--muted); transition: background .3s, height .3s; }
+body.on-air .eq i { background: var(--accent); animation: eq .9s steps(5, end) infinite alternate; }
+body.on-air .eq i:nth-child(2) { animation-duration: .7s; animation-delay: -.3s; }
+body.on-air .eq i:nth-child(3) { animation-duration: 1.05s; animation-delay: -.6s; }
+body.on-air .eq i:nth-child(4) { animation-duration: .8s; animation-delay: -.15s; }
+@keyframes eq { 0% { height: 15%; } 50% { height: 95%; } 100% { height: 40%; } }
+.now-info { min-width: 0; }
+.now-info .bk { font-weight: 900; font-size: 15px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.now-info .ct { font-family: var(--f-tech); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.transport { display: flex; align-items: center; gap: 4px; }
+.tbtn {
+  width: 40px; height: 40px; border: 0; background: transparent; display: grid; place-items: center; padding: 0;
+  color: var(--ink); transition: color .15s, background .15s, transform .12s;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+}
+.tbtn:hover { background: var(--surface-2); color: var(--accent); }
+.tbtn:active { transform: scale(.86); }
+.tbtn svg { width: 20px; height: 20px; fill: currentColor; }
+.tbtn.play {
+  position: relative; width: 58px; height: 58px; margin: 0 8px; clip-path: none; border-radius: 50%;
+  background: var(--accent); color: var(--accent-ink);
+  box-shadow: 0 0 0 3px #0B0B0D, 0 0 0 4px var(--accent);
+  transition: transform .2s var(--ease), box-shadow .3s;
+}
+.tbtn.play:hover { background: var(--accent); color: var(--accent-ink); transform: scale(1.05); }
+.tbtn.play:active { transform: scale(.93); }
+/* 播放時外圈虛線慢慢轉，像唱盤 */
+.tbtn.play::after {
+  content: ""; position: absolute; inset: -9px; border-radius: 50%; border: 2px dashed var(--accent); opacity: 0; transition: opacity .3s;
+}
+body.on-air .tbtn.play::after { opacity: .7; animation: spin 6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.tbtn.play svg { width: 24px; height: 24px; }
+.tbtn.play svg path { transform-origin: center; animation: pop .25s var(--ease); }
+@keyframes pop { from { transform: scale(.5); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.tools { display: flex; align-items: center; justify-content: flex-end; gap: 10px; position: relative; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: transparent;
+  padding: 6px 14px; font-family: var(--f-tech); font-weight: 700; font-size: 13px; color: var(--ink);
+  clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+  transition: border-color .15s, color .15s, background .15s;
+}
+.chip:hover, .chip[aria-expanded="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.chip svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: square; }
+.sleep-left { font-family: var(--f-tech); font-weight: 700; color: var(--hot); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.settings {
+  position: absolute; right: 0; bottom: calc(100% + 22px); width: 310px; z-index: 50;
+  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow);
+  padding: 18px; display: grid; gap: 16px;
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  transform-origin: bottom right; transition: opacity .18s var(--ease), transform .25s var(--ease), visibility .25s;
+}
+.settings::before { content: ""; position: absolute; left: 0; top: 0; width: 40%; height: 3px; background: var(--accent); }
+.settings:not(.open) { opacity: 0; transform: translateY(10px); visibility: hidden; pointer-events: none; }
+.settings h3 { margin: 0; font-family: var(--f-tech); font-size: 12px; letter-spacing: .24em; color: var(--accent); font-weight: 700; }
+.field { display: grid; gap: 6px; font-size: 13px; }
+.field .lbl { display: flex; justify-content: space-between; color: var(--muted); font-weight: 700; }
+.field output { font-family: var(--f-tech); color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+.field select { width: 100%; border: 1px solid var(--line); background: var(--surface-2); padding: 8px 10px; font-size: 14px; color: var(--ink); }
+.field select:focus { border-color: var(--accent); outline: none; }
+.field input[type=range] { width: 100%; accent-color: var(--accent); }
+.presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.presets button {
+  border: 1px solid var(--line); background: transparent; padding: 3px 10px; font-family: var(--f-tech); font-weight: 700; font-size: 12px; color: var(--muted);
+  clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%); transition: all .15s;
+}
+.presets button:hover { border-color: var(--accent); color: var(--ink); }
+.presets button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+.switch { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch .knob {
+  position: relative; flex: none; width: 40px; height: 20px; border: 1px solid var(--line); background: var(--surface-2);
+  clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%); transition: background .2s, border-color .2s;
+}
+.switch .knob::after {
+  content: ""; position: absolute; top: 3px; left: 5px; width: 12px; height: 12px; background: var(--muted);
+  transition: transform .25s var(--ease), background .2s;
+}
+.switch input:checked + .knob { background: var(--accent); border-color: var(--accent); }
+.switch input:checked + .knob::after { transform: translateX(16px); background: var(--accent-ink); }
+.switch input:focus-visible + .knob { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 收音機刻度盤進度條 */
+.dial { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; font-family: var(--f-tech); font-weight: 700; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar {
+  position: relative; flex: 1; height: 18px; cursor: pointer;
+  background:
+    repeating-linear-gradient(90deg, var(--line) 0 2px, transparent 2px 8px) 0 50% / 100% 6px no-repeat,
+    repeating-linear-gradient(90deg, var(--muted) 0 2px, transparent 2px 48px) 0 50% / 100% 12px no-repeat;
+}
+.bar > div {
+  position: absolute; left: 0; top: 50%; height: 6px; transform: translateY(-50%);
+  background: repeating-linear-gradient(90deg, var(--accent) 0 2px, transparent 2px 8px);
+  width: 0; transition: width .5s var(--ease);
+}
+.bar > div::after {
+  content: ""; position: absolute; right: -2px; top: 50%; width: 4px; height: 20px; transform: translateY(-50%);
+  background: var(--hot); box-shadow: 0 0 12px var(--hot);
+}
+.bar:hover > div::after { height: 24px; }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(var(--player-h) + 36px + env(safe-area-inset-bottom, 0px)); z-index: 60;
+  transform: translateX(-50%); background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 10px 22px; font-size: 14px;
+  max-width: calc(100% - 32px); clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  animation: toastIn .3s var(--ease);
+}
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+.scrim { display: none; }
+
+@media (max-width: 900px) {
+  :root { --player-h: 182px; }
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  body.side-collapsed .layout { grid-template-columns: minmax(0, 1fr); }
+  .side {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 70; width: min(340px, 88vw); max-height: none;
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 14px calc(16px + env(safe-area-inset-bottom, 0px)) max(14px, env(safe-area-inset-left, 0px));
+    background: var(--bg); border-right: 2px solid var(--accent);
+    transform: translateX(-104%); transition: transform .4s var(--ease);
+  }
+  body.drawer-open .side { transform: none; opacity: 1; pointer-events: auto; }
+  body.side-collapsed .side { opacity: 1; }
+  .scrim { display: block; position: fixed; inset: 0; z-index: 65; background: rgba(0, 0, 0, .6); opacity: 0; pointer-events: none; transition: opacity .3s; }
+  body.drawer-open .scrim { opacity: 1; pointer-events: auto; }
+  .player { padding: 16px 14px 10px; width: calc(100% - 20px); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .player-in { grid-template-columns: minmax(0, 1fr) auto; }
+  .transport { grid-column: 1 / -1; justify-content: center; order: 3; }
+  .dial { order: 4; }
+  .settings { position: fixed; left: 10px; right: 10px; width: auto; bottom: calc(var(--player-h) + 24px + env(safe-area-inset-bottom, 0px)); transform-origin: bottom center; }
+  .status, .logo .en { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="icon-btn" id="sideToggle" aria-label="顯示或隱藏側邊欄" title="側邊欄">
+    <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+  </button>
+  <div class="logo">
+    <img class="logo-cat" src="/icon.png" alt="" width="34" height="34">
+    <span class="lamp" id="lamp" aria-hidden="true"></span>
+    <h1>小說電台</h1>
+    <span class="en">NOVEL RADIO</span>
+  </div>
+  <span class="status" id="freq">ON AIR · 待機中</span>
+  <span class="spacer"></span>
+  <button class="icon-btn wide" id="openSite" aria-label="用瀏覽器打開這一頁的原網頁" title="用瀏覽器打開原網頁">
+    <svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg><span class="lbl">原網頁</span>
+  </button>
+  <button class="icon-btn" id="fontDown" aria-label="縮小字體" title="縮小字體"><span class="txt">A−</span></button>
+  <button class="icon-btn" id="fontUp" aria-label="放大字體" title="放大字體"><span class="txt">A+</span></button>
+  <button class="icon-btn" id="themeToggle" hidden aria-label="切換深色／淺色" title="切換深色／淺色">
+    <svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+  </button>
+</header>
+
+<div class="scrim" id="scrim"></div>
+
+<div class="layout">
+  <aside class="side" id="side">
+    <form class="open-box" id="openForm">
+      <svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+      <input id="urlInput" placeholder="貼上小說的書或章節網址" autocomplete="off">
+      <button class="go" type="submit">開始</button>
+    </form>
+
+    <div class="tabs-card">
+      <div class="tabs" id="tabs" data-tab="toc" role="tablist">
+        <span class="tab-ink" aria-hidden="true"></span>
+        <button class="tab" role="tab" data-tab="toc" aria-selected="true">目錄</button>
+        <button class="tab" role="tab" data-tab="recent" aria-selected="false">最近在聽</button>
+      </div>
+      <div class="pane" id="paneToc">
+        <section id="tocPanel" hidden>
+          <div class="toc-book" id="tocBook"></div>
+          <div class="toc" id="toc"></div>
+        </section>
+        <div class="pane-empty">開啟一本書後，<br>目錄會出現在這裡。</div>
+      </div>
+      <div class="pane" id="paneRecent" hidden>
+        <section id="recentPanel" hidden>
+          <ul class="recent" id="recent"></ul>
+        </section>
+        <div class="pane-empty">還沒有聽過的書。</div>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <article class="page" id="page">
+      <header class="ch-head">
+        <span class="eyebrow" id="chEyebrow">STANDBY · 待機中</span>
+        <h2 id="chTitle">今晚想聽哪一本？</h2>
+        <span class="rule" aria-hidden="true"></span>
+      </header>
+      <div class="reader" id="reader">
+        <div class="welcome">
+          <ol class="steps">
+            <li>在 linovelib 打開想聽的書或章節，複製網址列的網址。</li>
+            <li>貼到左邊的輸入框，按「開始」。</li>
+            <li>按下播放。念完一頁會自動接下一頁、下一章，可以一直當背景廣播。</li>
+          </ol>
+          <p>點任一句可以從那裡開始念。快捷鍵：<kbd>空白鍵</kbd> 播放／暫停，<kbd>←</kbd> <kbd>→</kbd> 上一句／下一句。</p>
+        </div>
+      </div>
+    </article>
+  </main>
+</div>
+
+<div class="player" id="player">
+  <div class="hazard" aria-hidden="true"></div>
+  <div class="player-in">
+    <div class="now">
+      <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <div class="now-info">
+        <div class="bk" id="nowBook">尚未開啟小說</div>
+        <div class="ct" id="nowCh">—</div>
+      </div>
+    </div>
+    <div class="transport">
+      <button class="tbtn" id="prevPg" aria-label="上一頁" title="上一頁"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM19 6.2v11.6a.8.8 0 0 1-1.2.7L9.6 12.7a.8.8 0 0 1 0-1.4l8.2-5.8a.8.8 0 0 1 1.2.7z"/></svg></button>
+      <button class="tbtn" id="prevS" aria-label="上一句" title="上一句"><svg viewBox="0 0 24 24"><path d="M11.5 6.6v10.8a.7.7 0 0 1-1.1.6L3.5 12.6a.7.7 0 0 1 0-1.2l6.9-5.4a.7.7 0 0 1 1.1.6zM20.5 6.6v10.8a.7.7 0 0 1-1.1.6l-6.9-5.4a.7.7 0 0 1 0-1.2l6.9-5.4a.7.7 0 0 1 1.1.6z"/></svg></button>
+      <button class="tbtn play" id="play" aria-label="播放" title="播放（空白鍵）"><svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5.6v12.8a.9.9 0 0 0 1.4.8l10-6.4a.9.9 0 0 0 0-1.6l-10-6.4A.9.9 0 0 0 8 5.6z"/></svg></button>
+      <button class="tbtn" id="nextS" aria-label="下一句" title="下一句"><svg viewBox="0 0 24 24"><path d="M12.5 6.6v10.8a.7.7 0 0 0 1.1.6l6.9-5.4a.7.7 0 0 0 0-1.2l-6.9-5.4a.7.7 0 0 0-1.1.6zM3.5 6.6v10.8a.7.7 0 0 0 1.1.6l6.9-5.4a.7.7 0 0 0 0-1.2L4.6 6a.7.7 0 0 0-1.1.6z"/></svg></button>
+      <button class="tbtn" id="nextPg" aria-label="下一頁" title="下一頁"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM5 6.2v11.6a.8.8 0 0 0 1.2.7l8.2-5.8a.8.8 0 0 0 0-1.4L6.2 5.5a.8.8 0 0 0-1.2.7z"/></svg></button>
+    </div>
+    <div class="tools">
+      <span class="sleep-left" id="sleepLeft"></span>
+      <button class="chip" id="galleryBtn" title="看這一卷的插圖，不會中斷朗讀">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/></svg>
+        <span>插圖</span>
+      </button>
+      <button class="chip" id="settingsBtn" aria-expanded="false" aria-controls="settings">
+        <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+        <span id="rateChip">1.0×</span>
+      </button>
+      <div class="settings" id="settings" role="dialog" aria-label="朗讀設定">
+        <h3>朗讀設定</h3>
+        <label class="field"><span class="lbl">聲音</span><select id="voice"></select></label>
+        <label class="field"><span class="lbl">語速 <output id="rateOut">1.0×</output></span><input type="range" id="rate" min="0.5" max="3" step="0.1" value="1"></label>
+        <div class="presets" id="ratePresets">
+          <button type="button" data-rate="0.8">0.8×</button><button type="button" data-rate="1">1×</button>
+          <button type="button" data-rate="1.25">1.25×</button><button type="button" data-rate="1.5">1.5×</button><button type="button" data-rate="2">2×</button>
+        </div>
+        <label class="field"><span class="lbl">音量 <output id="volumeOut">100%</output></span><input type="range" id="volume" min="0" max="1" step="0.05" value="1"></label>
+        <label class="field"><span class="lbl">音調 <output id="pitchOut">1.00</output></span><input type="range" id="pitch" min="0.5" max="1.5" step="0.05" value="1"></label>
+        <label class="field"><span class="lbl">睡眠定時</span><select id="sleep">
+          <option value="0">關閉</option><option value="15">15 分鐘後停止</option><option value="30">30 分鐘後停止</option>
+          <option value="45">45 分鐘後停止</option><option value="60">60 分鐘後停止</option><option value="90">90 分鐘後停止</option>
+          <option value="ch">念完這一章就停止</option>
+        </select></label>
+        <label class="switch"><input type="checkbox" id="autoNext" checked><span class="knob" aria-hidden="true"></span><span>念完自動播下一章</span></label>
+        <label class="switch"><input type="checkbox" id="showImages" checked><span class="knob" aria-hidden="true"></span><span>顯示插圖</span></label>
+      </div>
+    </div>
+    <div class="dial">
+      <span id="sIdx">0 / 0</span>
+      <div class="bar" id="bar" title="點擊跳到這個位置"><div id="barFill"></div></div>
+      <span id="remain">—</span>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<div class="gallery" id="gallery" role="dialog" aria-label="這一卷的插圖" hidden>
+  <div class="gallery-panel">
+    <div class="gallery-head">
+      <h3 id="galleryTitle">插圖</h3>
+      <span class="gallery-count" id="galleryCount"></span>
+      <span class="spacer"></span>
+      <span class="gallery-note">朗讀會繼續，不會換章</span>
+      <button class="lb-btn gallery-close" id="galleryClose" aria-label="關閉">×</button>
+    </div>
+    <p class="gallery-msg" id="galleryMsg" hidden></p>
+    <div class="gallery-grid" id="galleryGrid"></div>
+  </div>
+</div>
+<div class="lightbox" id="lightbox" role="dialog" aria-label="插圖" hidden>
+  <img id="lbImg" alt="插圖">
+  <button class="lb-btn lb-prev" id="lbPrev" aria-label="上一張">‹</button>
+  <button class="lb-btn lb-next" id="lbNext" aria-label="下一張">›</button>
+  <button class="lb-btn lb-close" id="lbClose" aria-label="關閉">×</button>
+  <span class="lb-count" id="lbCount"></span>
+</div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const synth = window.speechSynthesis;
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem("nr:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("nr:" + k, JSON.stringify(v)); } catch {} }
+};
+const settings = Object.assign({ rate: 1, pitch: 1, voiceURI: "", size: 19, theme: "", side: true, tab: "toc", autoNext: true, volume: 1, showImages: true }, LS.get("settings", {}));
+const saveSettings = () => LS.set("settings", settings);
+const narrow = () => matchMedia("(max-width: 900px)").matches;
+
+/* ---------- server calls ---------- */
+const pageCache = new Map();
+async function fetchRetry(url) {
+  for (let tries = 0; tries < 4; tries++) {
+    try { return await fetch(url); }
+    catch { await new Promise(res => setTimeout(res, 400 * (tries + 1))); } // 連線偶爾被中斷，自動重試
+  }
+  throw new Error("連不到小說電台的伺服器，確認黑色視窗還開著");
+}
+async function api(path, url) {
+  const r = await fetchRetry(`${path}?url=${encodeURIComponent(url)}`);
+  const j = await r.json().catch(() => ({ error: "伺服器回應怪怪的，請再試一次" }));
+  if (!r.ok || j.error) throw new Error(j.error || "讀取失敗");
+  return j;
+}
+function getPage(url) {
+  if (!pageCache.has(url)) {
+    const p = api("/api/page", url);
+    pageCache.set(url, p);
+    p.catch(() => pageCache.delete(url));
+    if (pageCache.size > 12) pageCache.delete(pageCache.keys().next().value);
+  }
+  return pageCache.get(url);
+}
+
+/* ---------- sentence splitting ---------- */
+const MAX = 90;
+function splitSentences(paras) {
+  const out = [];
+  paras.forEach((p, pi) => {
+    const parts = p.match(/[^。！？!?…；;]*[。！？!?…；;]+[」』”’"）)]*|[^。！？!?…；;]+$/g) || [p];
+    parts.forEach(s => {
+      s = s.trim(); if (!s) return;
+      while (s.length > MAX) {
+        let cut = -1;
+        for (let i = MAX; i > 20; i--) if ("，,、：:".includes(s[i])) { cut = i + 1; break; }
+        if (cut === -1) cut = MAX;
+        out.push({ text: s.slice(0, cut), p: pi }); s = s.slice(cut);
+      }
+      if (s) out.push({ text: s, p: pi });
+    });
+  });
+  return out;
+}
+
+// 第一頁時，標題是第 0 段，會先念出來
+const pageSentences = d => splitSentences(d.page === 1 && d.title ? [d.title, ...d.paras] : d.paras);
+
+/* ---------- state ---------- */
+let P = null, sents = [], sIdx = 0, catalog = null;
+let playing = false, token = 0, currentU = null;
+let voices = [], voice = null;      // 瀏覽器語音
+let edgeVoices = [], edgeDown = false; // Edge 自然語音（由本機伺服器產生）
+const DEFAULT_EDGE = "edge:zh-TW-HsiaoChenNeural";
+const isEdge = () => !edgeDown && edgeVoices.length > 0 && settings.voiceURI.startsWith("edge:");
+
+/* ---------- voices ---------- */
+function loadVoices() {
+  voices = synth ? synth.getVoices().slice() : [];
+  const score = v => {
+    const l = v.lang.toLowerCase().replace("_", "-"); let s = 0;
+    if (l.startsWith("zh")) s += 100;
+    if (l === "zh-tw" || l.includes("hant")) s += 30;
+    if (/natural|online|neural/i.test(v.name)) s += 20;
+    return s;
+  };
+  voices.sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
+  const sel = $("voice"); sel.innerHTML = "";
+  const group = (label, items) => {
+    if (!items.length) return;
+    const g = document.createElement("optgroup"); g.label = label;
+    items.forEach(([value, text]) => { const o = document.createElement("option"); o.value = value; o.textContent = text; g.appendChild(o); });
+    sel.appendChild(g);
+  };
+  group("Edge 自然語音（推薦）", edgeVoices.map(v => ["edge:" + v.id, `${v.name} · ${v.region} · ${v.gender}`]));
+  group("瀏覽器語音", voices.map(v => [v.voiceURI, `${v.name.replace(/^Microsoft\s+/, "").replace(/\s*-\s*.*$/, "")} · ${v.lang}`]));
+  if (!sel.options.length) sel.innerHTML = '<option value="">系統預設</option>';
+  const want = settings.voiceURI;
+  const opts = [...sel.options];
+  const pick = opts.find(o => o.value === want) || opts.find(o => o.value === DEFAULT_EDGE) || opts[0];
+  sel.value = pick.value;
+  // Edge 語音還沒載入時，不要把使用者選好的 Edge 聲音蓋掉
+  if (pick.value !== want && !(want.startsWith("edge:") && !edgeVoices.length)) { settings.voiceURI = pick.value; saveSettings(); }
+  voice = voices.find(v => v.voiceURI === sel.value) || voices[0] || null;
+}
+async function loadEdgeVoices() {
+  try {
+    const j = await (await fetchRetry("/api/voices")).json();
+    if (j.available && j.voices && j.voices.length) { edgeVoices = j.voices; loadVoices(); }
+    else if (!j.available) toast("沒有安裝 Edge 語音元件，目前使用瀏覽器語音");
+  } catch { /* 連不上就先用瀏覽器語音 */ }
+}
+if (synth) synth.onvoiceschanged = loadVoices;
+loadVoices();
+
+/* ---------- recent list ---------- */
+function recentList() { return LS.get("recent", []); }
+function saveRecent() {
+  if (!P) return;
+  const list = recentList().filter(r => r.bookId !== P.bookId);
+  list.unshift({ bookId: P.bookId, book: P.book, url: P.url, s: sIdx, title: P.title, t: Date.now() });
+  LS.set("recent", list.slice(0, 12));
+  renderRecent();
+}
+function renderRecent() {
+  const list = recentList(), ul = $("recent");
+  $("recentPanel").hidden = !list.length;
+  ul.innerHTML = "";
+  list.forEach(r => {
+    const li = document.createElement("li");
+    if (P && r.bookId === P.bookId) li.className = "active";
+    li.innerHTML = `<div class="meta"><div class="t"></div><div class="s"></div></div>`;
+    li.querySelector(".t").textContent = r.book || `書號 ${r.bookId}`;
+    li.querySelector(".s").textContent = `聽到：${r.title || "—"}`;
+    const del = document.createElement("button");
+    del.className = "btn"; del.textContent = "移除";
+    del.onclick = e => { e.stopPropagation(); LS.set("recent", recentList().filter(x => x.bookId !== r.bookId)); renderRecent(); };
+    li.appendChild(del);
+    li.onclick = () => { closeDrawer(); loadPage(r.url, { s: r.s, autoplay: playing }); };
+    ul.appendChild(li);
+  });
+}
+
+/* ---------- table of contents ---------- */
+async function ensureCatalog(bookId, anyUrl) {
+  if (catalog && catalog.bookId === bookId) { renderToc(); return catalog; }
+  for (let tries = 0; tries < 3; tries++) {
+    try { catalog = await api("/api/catalog", anyUrl); renderToc(); return catalog; }
+    catch (e) { catalog = null; $("tocPanel").hidden = true; await new Promise(r => setTimeout(r, 2000)); }
+  }
+  return catalog;
+}
+function renderToc() {
+  if (!catalog) return;
+  $("tocPanel").hidden = false;
+  $("tocBook").textContent = catalog.book;
+  const box = $("toc"); box.innerHTML = "";
+  let activeEl = null;
+  catalog.volumes.forEach(v => {
+    const d = document.createElement("details");
+    const sm = document.createElement("summary"); sm.textContent = v.title; d.appendChild(sm);
+    const ul = document.createElement("ul");
+    v.chapters.forEach(c => {
+      const li = document.createElement("li"); li.textContent = c.title;
+      if (P && c.id === P.chapterId) { li.className = "active"; d.open = true; activeEl = li; }
+      li.onclick = () => { closeDrawer(); loadPage(c.url, { autoplay: playing }); };
+      ul.appendChild(li);
+    });
+    d.appendChild(ul); box.appendChild(d);
+  });
+  if (!activeEl && box.firstChild) box.firstChild.open = true;
+  if (activeEl) activeEl.scrollIntoView({ block: "center" });
+}
+
+/* ---------- page loading ---------- */
+let loadSeq = 0;
+async function loadPage(url, { s = 0, autoplay = false } = {}) {
+  const seq = ++loadSeq; // 連點好幾章時，只採用最後一次點的
+  stop(true);
+  $("page").classList.add("loading");
+  $("chTitle").textContent = "讀取中…";
+  let data;
+  try { data = await getPage(url); }
+  catch (e) {
+    if (seq !== loadSeq) return;
+    $("page").classList.remove("loading");
+    toast(e.message); $("chTitle").textContent = P ? P.title : "讀取失敗";
+    setPlaying(false); return;
+  }
+  if (seq !== loadSeq) return;
+  $("page").classList.remove("loading");
+  P = data;
+  sents = pageSentences(P);
+  sIdx = Math.max(0, Math.min(s, sents.length - 1));
+  renderReader(P.page === 1 && !!P.title);
+  saveRecent();
+  window.scrollTo({ top: 0 });
+  ensureCatalog(P.bookId, P.url);
+  if (P.next) getPage(P.next).catch(() => {}); // 先讀好下一頁，換頁時不會停頓
+  if (autoplay) play(); else setPlaying(false);
+}
+
+async function openInput(raw) {
+  raw = raw.trim(); if (!raw) return;
+  closeDrawer();
+  $("chTitle").textContent = "讀取中…";
+  // 交給伺服器判斷是章節還是整本書（任何網站都一樣）
+  let res;
+  try { res = await api("/api/resolve", raw); }
+  catch (e) { toast(e.message); $("chTitle").textContent = P ? P.title : "讀取失敗"; return; }
+  if (res.kind === "chapter") { loadPage(res.url, { autoplay: false }); return; }
+  const rec = recentList().find(r => r.bookId === res.bookId);
+  if (rec) { loadPage(rec.url, { s: rec.s }); return; } // 聽過的書，接著上次的地方
+  catalog = null;
+  loadPage(res.first);
+}
+
+/* ---------- rendering ---------- */
+function renderReader(hasTitleSentence) {
+  const r = $("reader"); r.innerHTML = "";
+  $("chEyebrow").textContent = `${P.book}${P.page > 1 ? ` · 第 ${P.page} 頁` : ""}`;
+  $("chTitle").textContent = P.title;
+  let p = null, lastP = -1;
+  // 插圖：after 是「前面有幾段文字」；第一頁多了標題那一段，所以要往後挪一格
+  const off = hasTitleSentence ? 1 : 0;
+  const imgs = settings.showImages && P.images ? P.images : [];
+  let ii = 0;
+  const flushImgs = upto => { while (ii < imgs.length && imgs[ii].after + off <= upto) { r.appendChild(makeFigure(imgs[ii].src, ii)); ii++; } };
+  sents.forEach((s, i) => {
+    if (s.p !== lastP) {
+      flushImgs(s.p);
+      p = document.createElement("p"); lastP = s.p;
+      if (hasTitleSentence && s.p === 0) p.hidden = true; // 標題只念出來，不重複顯示
+      r.appendChild(p);
+    }
+    const sp = document.createElement("span");
+    sp.className = "s"; sp.dataset.i = i; sp.textContent = s.text;
+    p.appendChild(sp);
+  });
+  flushImgs(Infinity);
+  if (!sents.length && !ii) r.innerHTML = '<div class="empty">這一頁沒有文字。按下一頁繼續。</div>';
+  else if (!sents.length) r.insertAdjacentHTML("afterbegin", '<p class="empty illus-note">這一頁只有插圖，播放時會直接跳到下一頁。</p>');
+  $("nowBook").textContent = P.book;
+  $("galleryBtn").hidden = P.site !== "linovelib"; // 插圖集目前只有 linovelib 有；其他網站的插圖直接顯示在內文裡
+  $("nowCh").textContent = P.title + (P.page > 1 ? `（第 ${P.page} 頁）` : "");
+  try { if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: P.title, artist: P.book, album: "小說電台" }); } catch {}
+  const page = $("page");
+  page.classList.remove("enter"); void page.offsetWidth; page.classList.add("enter");
+  markSentence(false);
+}
+// ref 是插圖所在的網頁，有些網站會檢查圖片是從哪裡來的
+const imgUrl = src => `/api/img?src=${encodeURIComponent(src)}&ref=${encodeURIComponent(P ? P.url : "")}`;
+function makeFigure(src, index) {
+  const f = document.createElement("figure");
+  f.className = "illus";
+  const img = new Image();
+  img.loading = "lazy"; img.decoding = "async"; img.alt = `插圖 ${index + 1}`; img.src = imgUrl(src);
+  img.onload = () => f.classList.add("loaded");
+  img.onerror = () => { f.classList.add("broken"); f.dataset.msg = "插圖讀取失敗"; };
+  f.appendChild(img);
+  f.onclick = () => openLightbox(index, P.images);
+  return f;
+}
+
+/* ---------- 插圖全螢幕檢視 ---------- */
+let lbIndex = 0, lbList = [];
+function openLightbox(i, list) {
+  if (list) lbList = list; // 沒給清單就是在檢視中換圖，沿用同一份
+  list = lbList;
+  if (!list.length) return;
+  lbIndex = (i + list.length) % list.length;
+  $("lbImg").src = imgUrl(list[lbIndex].src);
+  $("lbCount").textContent = `${lbIndex + 1} / ${list.length}`;
+  $("lbPrev").hidden = $("lbNext").hidden = list.length < 2;
+  $("lightbox").hidden = false; syncModal();
+}
+const closeLightbox = () => { $("lightbox").hidden = true; syncModal(); };
+function syncModal() { document.body.classList.toggle("modal-open", !$("lightbox").hidden || !$("gallery").hidden); }
+$("lbClose").onclick = closeLightbox;
+$("lbPrev").onclick = e => { e.stopPropagation(); openLightbox(lbIndex - 1); };
+$("lbNext").onclick = e => { e.stopPropagation(); openLightbox(lbIndex + 1); };
+$("lightbox").onclick = e => { if (e.target.id === "lightbox" || e.target.id === "lbImg") closeLightbox(); };
+
+/* ---------- 這一卷的插圖集：另外跳出來看，不會換掉正在聽的章節 ---------- */
+let galleryFor = "";
+async function openGallery() {
+  if (!P) { toast("先開啟一本小說"); return; }
+  $("gallery").hidden = false; syncModal();
+  if (galleryFor === P.url && $("galleryGrid").children.length) return;
+  galleryFor = P.url;
+  $("galleryGrid").innerHTML = "";
+  $("galleryTitle").textContent = "插圖";
+  $("galleryMsg").textContent = "正在找這一卷的插圖…"; $("galleryMsg").hidden = false;
+  let data;
+  try {
+    const r = await fetchRetry(`/api/gallery?url=${encodeURIComponent(P.url)}`);
+    data = await r.json();
+    if (!r.ok || data.error) throw new Error(data.error || "讀取失敗");
+  } catch (e) { $("galleryMsg").textContent = e.message; galleryFor = ""; return; }
+  // 這一頁本身的插圖也放進來（有些書的插圖夾在一般章節裡）
+  const seen = new Set(data.images.map(i => i.src));
+  const list = data.images.concat((P.images || []).filter(i => !seen.has(i.src)).map(i => ({ src: i.src, chapter: P.title })));
+  $("galleryTitle").textContent = `${data.volume} · 插圖`;
+  if (!list.length) { $("galleryMsg").textContent = "這一卷沒有找到插圖。"; return; }
+  $("galleryMsg").hidden = true;
+  $("galleryCount").textContent = `${list.length} 張`;
+  list.forEach((im, i) => {
+    const b = document.createElement("button");
+    b.className = "thumb"; b.title = im.chapter || "";
+    const img = new Image(); img.loading = "lazy"; img.alt = `插圖 ${i + 1}`; img.src = imgUrl(im.src);
+    img.onload = () => b.classList.add("loaded");
+    b.appendChild(img);
+    b.onclick = () => openLightbox(i, list);
+    $("galleryGrid").appendChild(b);
+  });
+}
+const closeGallery = () => { $("gallery").hidden = true; syncModal(); };
+$("galleryBtn").onclick = openGallery;
+$("galleryClose").onclick = closeGallery;
+$("gallery").onclick = e => { if (e.target.id === "gallery") closeGallery(); };
+
+/* ---------- 用瀏覽器打開原網頁 ---------- */
+async function openInBrowser(url) {
+  try {
+    const r = await fetchRetry(`/api/open?url=${encodeURIComponent(url || "https://tw.linovelib.com/")}`);
+    const j = await r.json(); if (!r.ok || j.error) throw new Error(j.error);
+    toast("已經用瀏覽器打開");
+  } catch (e) { toast(e.message || "打不開瀏覽器"); }
+}
+$("openSite").onclick = () => openInBrowser(P ? P.url : "");
+
+function markSentence(scroll = true) {
+  const spans = $("reader").querySelectorAll(".s");
+  spans.forEach((el, i) => { el.classList.toggle("now", i === sIdx); el.classList.toggle("read", i < sIdx); });
+  const cur = spans[sIdx];
+  if (cur && scroll && cur.offsetParent) {
+    const rect = cur.getBoundingClientRect(), playerTop = $("player").getBoundingClientRect().top;
+    if (rect.top < 90 || rect.bottom > playerTop - 40)
+      cur.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }
+  $("sIdx").textContent = `${sents.length ? sIdx + 1 : 0} / ${sents.length}`;
+  $("barFill").style.width = sents.length ? `${(sIdx / Math.max(1, sents.length - 1)) * 100}%` : "0";
+  const left = sents.slice(sIdx).reduce((a, s) => a + s.text.length, 0);
+  $("remain").textContent = sents.length ? `本頁約剩 ${fmtTime(left / (4.2 * settings.rate))}` : "—";
+}
+const fmtTime = s => { s = Math.round(s); const m = Math.floor(s / 60); return m ? `${m} 分 ${s % 60} 秒` : `${s} 秒`; };
+const PLAY_ICON = '<path d="M8 5.6v12.8a.9.9 0 0 0 1.4.8l10-6.4a.9.9 0 0 0 0-1.6l-10-6.4A.9.9 0 0 0 8 5.6z"/>';
+const PAUSE_ICON = '<path d="M7 5h3.2a.8.8 0 0 1 .8.8v12.4a.8.8 0 0 1-.8.8H7a.8.8 0 0 1-.8-.8V5.8A.8.8 0 0 1 7 5zm6.8 0H17a.8.8 0 0 1 .8.8v12.4a.8.8 0 0 1-.8.8h-3.2a.8.8 0 0 1-.8-.8V5.8a.8.8 0 0 1 .8-.8z"/>';
+function setPlaying(v) {
+  const changed = v !== playing;
+  playing = v;
+  document.body.classList.toggle("on-air", v);
+  $("lamp").classList.toggle("on", v);
+  $("freq").textContent = v ? "ON AIR · 播送中" : "ON AIR · 待機中";
+  $("play").setAttribute("aria-label", v ? "暫停" : "播放");
+  try { if ("mediaSession" in navigator) navigator.mediaSession.playbackState = v ? "playing" : "paused"; } catch {}
+  if (changed || !$("playIcon").innerHTML) $("playIcon").innerHTML = v ? PAUSE_ICON : PLAY_ICON;
+}
+
+/* ---------- Edge voice playback ---------- */
+const audio = new Audio();
+audio.preload = "auto";
+const clips = new Map(); // 句子 → 音檔網址（Promise），先準備後面幾句，句子之間才不會停頓
+const pitchHz = () => Math.round((settings.pitch - 1) * 100);
+const speakable = t => !/^[\s\p{P}\p{S}]*$/u.test(t);
+function getClip(text) {
+  const voiceId = settings.voiceURI.slice(5);
+  const key = `${voiceId}|${pitchHz()}|${text}`;
+  if (!clips.has(key)) {
+    const p = fetchRetry(`/api/tts?voice=${encodeURIComponent(voiceId)}&pitch=${pitchHz()}&text=${encodeURIComponent(text)}`)
+      .then(async r => {
+        if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || "Edge 語音產生失敗"); }
+        return URL.createObjectURL(await r.blob());
+      });
+    clips.set(key, p);
+    p.catch(() => clips.delete(key));
+    if (clips.size > 40) {
+      const [k, old] = clips.entries().next().value;
+      clips.delete(k); old.then(u => URL.revokeObjectURL(u)).catch(() => {});
+    }
+  }
+  return clips.get(key);
+}
+function prefetchAhead() {
+  for (let k = 1; k <= 3; k++) { const s = sents[sIdx + k]; if (s && speakable(s.text)) getClip(s.text).catch(() => {}); }
+  if (sIdx >= sents.length - 3 && P && P.next) // 快念完這一頁時，先準備下一頁的第一句
+    getPage(P.next).then(d => { const f = pageSentences(d).find(s => speakable(s.text)); if (f && isEdge()) getClip(f.text).catch(() => {}); }).catch(() => {});
+}
+let edgeFails = 0;
+async function speakEdge() {
+  const s = sents[sIdx];
+  const my = ++token;
+  markSentence(); prefetchAhead();
+  let src;
+  try { src = await getClip(s.text); edgeFails = 0; }
+  catch (e) {
+    if (my !== token || !playing) return;
+    if (++edgeFails >= 3) {
+      edgeDown = true; // 連續失敗就暫時改用瀏覽器語音，一分鐘後再試 Edge
+      toast("Edge 語音連不上，先改用瀏覽器語音");
+      setTimeout(() => { edgeDown = false; edgeFails = 0; }, 60000);
+    }
+    setTimeout(() => { if (my === token && playing) speak(); }, 1000);
+    return;
+  }
+  if (my !== token || !playing) return;
+  audio.src = src;
+  audio.playbackRate = settings.rate; audio.preservesPitch = true; audio.volume = settings.volume;
+  audio.onended = () => {
+    if (my !== token || !playing) return;
+    sIdx++;
+    if (++saveTick % 3 === 0) saveRecent();
+    speak();
+  };
+  audio.onerror = () => { if (my !== token || !playing) return; sIdx++; speak(); };
+  try { await audio.play(); }
+  catch (e) {
+    if (my !== token) return;
+    if (e.name === "NotAllowedError") { setPlaying(false); toast("瀏覽器擋住了自動播放，請按一下播放鍵"); }
+  }
+}
+
+/* ---------- speech engine ---------- */
+let saveTick = 0;
+function speak() {
+  if (sIdx >= sents.length) { endOfPage(); return; }
+  if (!speakable(sents[sIdx].text)) { sIdx++; speak(); return; }
+  if (isEdge()) { speakEdge(); return; }
+  if (!synth) { toast("這個瀏覽器不支援語音朗讀，請改用 Edge 或 Chrome"); setPlaying(false); return; }
+  const s = sents[sIdx];
+  const u = new SpeechSynthesisUtterance(s.text);
+  if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = "zh-TW";
+  u.rate = settings.rate; u.pitch = settings.pitch; u.volume = settings.volume;
+  const my = ++token;
+  let started = false, done = false, guard = null;
+  const finish = () => {
+    if (done || my !== token || !playing) return;
+    done = true; clearTimeout(guard); retries = 0;
+    sIdx++;
+    if (++saveTick % 3 === 0) saveRecent();
+    speak();
+  };
+  u.onstart = () => { started = true; };
+  u.onend = finish;
+  u.onerror = e => {
+    if (my !== token || !playing) return;
+    if (e.error === "interrupted" || e.error === "canceled") return;
+    finish();
+  };
+  // 保險計時器：瀏覽器偶爾會吞掉 speak()，或念完卻不發 onend，這時自己接下去，播放才不會卡住
+  const expect = (s.text.length / (3 * settings.rate)) * 1000 + 6000;
+  const check = () => {
+    if (done || my !== token || !playing) return;
+    if (synth.speaking) { guard = setTimeout(check, 3000); return; }
+    finish();
+  };
+  guard = setTimeout(() => {
+    if (done || my !== token || !playing) return;
+    if (!started && !synth.speaking && !synth.pending) {
+      if (retries++ < 1) { token++; synth.cancel(); setTimeout(() => playing && speak(), 120); return; }
+      finish(); return; // 試了幾次都念不出來，跳過這句
+    }
+    guard = setTimeout(check, Math.max(3000, expect - 3000));
+  }, 3000);
+  currentU = u; // 保留參照，避免念到一半被回收
+  markSentence();
+  synth.speak(u);
+}
+let retries = 0;
+
+function nextFromCatalog() {
+  if (!catalog || !P) return null;
+  const all = catalog.volumes.flatMap(v => v.chapters);
+  const i = all.findIndex(c => c.id === P.chapterId);
+  return i >= 0 && i + 1 < all.length ? all[i + 1].url : null;
+}
+function endOfPage() {
+  let next = P.next, sameChapter = P.nextSameChapter;
+  if (!next) { next = nextFromCatalog(); sameChapter = false; } // 網頁上沒有下一章連結時，改用目錄找
+  if (!next) { setPlaying(false); saveRecent(); toast("全書念完了"); return; }
+  if (!sameChapter) {
+    if (sleepMode === "ch") { sleepFire(); loadPage(next); return; }
+    if (!settings.autoNext) { stop(); toast("這一章念完了"); loadPage(next); return; }
+    toast("這一章念完了，自動播放下一章");
+  }
+  loadPage(next, { autoplay: true });
+}
+function play() {
+  if (!P) { toast("先貼上小說網址"); $("urlInput").focus(); return; }
+  setPlaying(true);
+  if (synth) synth.cancel();
+  audio.pause();
+  // cancel 之後馬上 speak，Chrome／Edge 有時會整句吞掉，所以稍等一下再念
+  const t = ++token;
+  setTimeout(() => { if (playing && t === token) speak(); }, 120);
+  requestWake();
+}
+function stop(keepState) {
+  token++;
+  if (synth) synth.cancel();
+  audio.pause();
+  if (!keepState) { setPlaying(false); releaseWake(); saveRecent(); }
+}
+function toggle() { playing ? stop() : play(); }
+function restartIfPlaying() {
+  if (!playing) return;
+  token++; if (synth) synth.cancel(); audio.pause();
+  setTimeout(() => playing && speak(), 60);
+}
+function jumpSentence(d) {
+  if (!P) return;
+  const n = sIdx + d;
+  if (n < 0) { if (P.prev) loadPage(P.prev, { s: 1e9, autoplay: playing }); return; }
+  if (n >= sents.length) { if (P.next) loadPage(P.next, { autoplay: playing }); return; }
+  sIdx = n; markSentence(); restartIfPlaying();
+}
+
+/* ---------- sleep timer ---------- */
+let sleepMode = "0", sleepAt = 0, sleepTick = null;
+function setSleep(v) {
+  sleepMode = v; clearInterval(sleepTick); $("sleepLeft").textContent = "";
+  if (v === "0") return;
+  if (v === "ch") { $("sleepLeft").textContent = "本章結束後停止"; return; }
+  sleepAt = Date.now() + Number(v) * 60000;
+  const tick = () => {
+    const left = (sleepAt - Date.now()) / 1000;
+    if (left <= 0) { sleepFire(); return; }
+    $("sleepLeft").textContent = `⏾ ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, "0")}`;
+  };
+  tick(); sleepTick = setInterval(tick, 1000);
+}
+function sleepFire() {
+  stop(); clearInterval(sleepTick); sleepMode = "0"; $("sleep").value = "0"; $("sleepLeft").textContent = "";
+  toast("睡眠定時到了，已停止播放。晚安");
+}
+
+/* ---------- keep screen awake while playing ---------- */
+let wake = null;
+async function requestWake() { try { wake = await navigator.wakeLock?.request("screen"); } catch {} }
+function releaseWake() { try { wake?.release(); } catch {} wake = null; }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && playing) requestWake(); });
+
+let toastT;
+function toast(msg) {
+  const t = $("toast"); t.hidden = true; void t.offsetWidth;
+  t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3500);
+}
+
+/* ---------- side drawer, tabs, theme, settings popover ---------- */
+function closeDrawer() { document.body.classList.remove("drawer-open"); }
+function applySide() { document.body.classList.toggle("side-collapsed", !settings.side); }
+$("sideToggle").onclick = () => {
+  if (narrow()) document.body.classList.toggle("drawer-open");
+  else { settings.side = !settings.side; applySide(); saveSettings(); }
+};
+$("scrim").onclick = closeDrawer;
+
+function setTab(name) {
+  settings.tab = name; saveSettings();
+  $("tabs").dataset.tab = name;
+  document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+  $("paneToc").hidden = name !== "toc";
+  $("paneRecent").hidden = name !== "recent";
+}
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+
+function applyTheme() {
+  if (settings.theme) document.documentElement.dataset.theme = settings.theme;
+  else delete document.documentElement.dataset.theme;
+}
+$("themeToggle").onclick = () => {
+  const isDark = settings.theme ? settings.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  settings.theme = isDark ? "light" : "dark"; applyTheme(); saveSettings();
+};
+
+function setSettingsOpen(open) {
+  $("settings").classList.toggle("open", open);
+  $("settingsBtn").setAttribute("aria-expanded", String(open));
+}
+$("settingsBtn").onclick = e => { e.stopPropagation(); setSettingsOpen(!$("settings").classList.contains("open")); };
+$("settings").addEventListener("click", e => e.stopPropagation());
+document.addEventListener("click", () => setSettingsOpen(false));
+
+function showRate() {
+  const r = Math.round(settings.rate * 100) / 100;
+  $("rateOut").textContent = (r % 1 ? String(r) : r.toFixed(1)) + "×";
+  $("rateChip").textContent = $("rateOut").textContent;
+  document.querySelectorAll("#ratePresets button").forEach(b => b.classList.toggle("on", Number(b.dataset.rate) === settings.rate));
+}
+document.querySelectorAll("#ratePresets button").forEach(b => b.onclick = () => {
+  settings.rate = Number(b.dataset.rate); $("rate").value = settings.rate; showRate(); saveSettings(); restartIfPlaying(); markSentence(false);
+});
+
+/* ---------- wiring ---------- */
+$("openForm").onsubmit = e => { e.preventDefault(); openInput($("urlInput").value); };
+$("play").onclick = toggle;
+$("prevS").onclick = () => jumpSentence(-1);
+$("nextS").onclick = () => jumpSentence(1);
+$("prevPg").onclick = () => P && P.prev && loadPage(P.prev, { autoplay: playing });
+$("nextPg").onclick = () => P && P.next && loadPage(P.next, { autoplay: playing });
+$("reader").addEventListener("click", e => {
+  const s = e.target.closest(".s"); if (!s) return;
+  sIdx = Number(s.dataset.i); markSentence(false);
+  if (playing) restartIfPlaying(); else play();
+});
+$("bar").onclick = e => {
+  if (!sents.length) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  sIdx = Math.min(sents.length - 1, Math.floor(((e.clientX - r.left) / r.width) * sents.length));
+  markSentence(); restartIfPlaying();
+};
+$("voice").onchange = e => {
+  settings.voiceURI = e.target.value; edgeDown = false; edgeFails = 0;
+  voice = voices.find(v => v.voiceURI === e.target.value) || voices[0] || null;
+  saveSettings(); restartIfPlaying();
+};
+// Edge 語音是音檔，語速和音量可以直接調，不用重念這一句
+$("rate").oninput = e => { settings.rate = Number(e.target.value); showRate(); audio.playbackRate = settings.rate; };
+$("rate").onchange = () => { saveSettings(); if (!isEdge()) restartIfPlaying(); markSentence(false); };
+$("pitch").oninput = e => { settings.pitch = Number(e.target.value); $("pitchOut").textContent = settings.pitch.toFixed(2); };
+$("pitch").onchange = () => { saveSettings(); restartIfPlaying(); };
+const showVolume = () => { $("volumeOut").textContent = Math.round(settings.volume * 100) + "%"; };
+$("volume").value = settings.volume; showVolume();
+$("volume").oninput = e => { settings.volume = Number(e.target.value); showVolume(); audio.volume = settings.volume; };
+// 瀏覽器語音不能在念到一半時改音量，所以放開滑桿後從這一句重新念；Edge 語音則是即時生效
+$("volume").onchange = () => { saveSettings(); if (!isEdge()) restartIfPlaying(); };
+$("sleep").onchange = e => setSleep(e.target.value);
+$("showImages").checked = settings.showImages;
+$("showImages").onchange = e => {
+  settings.showImages = e.target.checked; saveSettings();
+  if (P) renderReader(P.page === 1 && !!P.title);
+};
+$("autoNext").checked = settings.autoNext;
+$("autoNext").onchange = e => { settings.autoNext = e.target.checked; saveSettings(); toast(settings.autoNext ? "念完會自動播下一章" : "念完這一章會停下來"); };
+const applySize = () => document.documentElement.style.setProperty("--read-size", settings.size + "px");
+$("fontUp").onclick = () => { settings.size = Math.min(30, settings.size + 1); applySize(); saveSettings(); };
+$("fontDown").onclick = () => { settings.size = Math.max(14, settings.size - 1); applySize(); saveSettings(); };
+document.addEventListener("keydown", e => {
+  if (!$("lightbox").hidden) { // 看插圖時，方向鍵是換圖，不是換句子
+    if (e.key === "Escape") closeLightbox();
+    else if (e.key === "ArrowRight") openLightbox(lbIndex + 1);
+    else if (e.key === "ArrowLeft") openLightbox(lbIndex - 1);
+    e.preventDefault(); return;
+  }
+  if (!$("gallery").hidden && e.key === "Escape") { closeGallery(); return; }
+  if (e.key === "Escape") { setSettingsOpen(false); closeDrawer(); return; }
+  if (e.target.matches("input, textarea, select")) return;
+  if (e.code === "Space") { e.preventDefault(); toggle(); }
+  else if (e.key === "ArrowRight") jumpSentence(1);
+  else if (e.key === "ArrowLeft") jumpSentence(-1);
+});
+window.addEventListener("beforeunload", () => { saveRecent(); synth && synth.cancel(); });
+
+// 鍵盤上的播放／暫停、上一首、下一首鍵，以及 Windows 音量面板上的控制鈕
+if ("mediaSession" in navigator) {
+  const ms = navigator.mediaSession;
+  [["play", () => play()], ["pause", () => stop()], ["stop", () => stop()],
+   ["nexttrack", () => $("nextPg").click()], ["previoustrack", () => $("prevPg").click()]]
+    .forEach(([a, f]) => { try { ms.setActionHandler(a, f); } catch {} });
+}
+
+/* ---------- boot ---------- */
+loadEdgeVoices();
+$("rate").value = settings.rate; showRate();
+$("pitch").value = settings.pitch; $("pitchOut").textContent = settings.pitch.toFixed(2);
+applySize(); applyTheme(); applySide(); setTab(settings.tab || "toc"); setPlaying(false);
+renderRecent();
+const last = recentList()[0];
+if (last) loadPage(last.url, { s: last.s });
+else if (!recentList().length) setTab("toc");
+})();
+</script>
+</body>
+</html>

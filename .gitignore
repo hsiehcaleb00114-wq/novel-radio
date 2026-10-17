@@ -1,0 +1,16 @@
+# 程式執行時產生的資料（書架、進度、設定）
+.app-data/
+app-error.log
+__pycache__/
+*.pyc
+
+# 打包產物與捷徑
+*.exe
+*.lnk
+build/
+dist/
+*.spec
+
+# 個人的自訂圖示和舊版備份
+assets/icon-custom.*
+reader.before-*.html
